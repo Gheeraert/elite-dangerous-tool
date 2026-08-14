@@ -115,3 +115,20 @@ def iter_journal_events(files: list[Path]) -> Iterator[dict]:
                         continue
         except OSError:
             continue
+
+
+def latest_position(journal_dir: Path) -> dict | None:
+    """Position stellaire la plus récente connue du commander, d'après le
+    dernier événement portant un `StarPos` (FSDJump, CarrierJump, Location —
+    ce dernier écrit notamment à la connexion/respawn). Coordonnées en
+    années-lumière, telles que fournies par le jeu. None si rien trouvé
+    (aucun journal, ou aucun de ces événements dedans)."""
+    latest: dict | None = None
+    for event in iter_journal_events(list_journal_files(journal_dir)):
+        if event.get("event") in ("FSDJump", "CarrierJump", "Location") and "StarPos" in event:
+            latest = {
+                "system": event.get("StarSystem"),
+                "coords": event.get("StarPos"),
+                "timestamp": event.get("timestamp"),
+            }
+    return latest

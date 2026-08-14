@@ -17,11 +17,14 @@ elite-dangerous-tool/
 ├── sources/            # accès bruts à chaque source de données
 │   ├── community.py    # tick EDCD + prix Ardent (aucune clé requise)
 │   ├── capi.py          # OAuth2 + endpoints Frontier CAPI (authentifiée)
-│   └── journal.py       # lecture des fichiers Status/Cargo/ShipLocker + Journal.*.log
+│   ├── journal.py       # lecture des fichiers Status/Cargo/ShipLocker + Journal.*.log
+│   ├── edsm.py           # coordonnées d'un système par nom (EDSM, aucune clé requise)
+│   └── navigation.py     # distance en années-lumière entre deux coordonnées (calcul pur)
 ├── modules/             # une fonction collect() -> dict par module métier
 │   ├── commander.py     # Module 1 : identité, finances, vaisseau, flotte, fleet carrier
 │   ├── market.py         # Module 2 : tick BGS + meilleures stations achat/vente
-│   └── logbook.py        # Module 3 : journal de bord chronologique résumé
+│   ├── logbook.py        # Module 3 : journal de bord chronologique résumé
+│   └── distance.py       # Module 4 : distance à un système donné, à la volée
 ├── storage/              # pont SQLite entre les collectes et leur exploitation dans le temps
 │   ├── db.py             # connexion + schéma (créé automatiquement au premier usage)
 │   ├── collector.py       # collect() -> ligne brute dans la table `collections`
@@ -63,7 +66,30 @@ Chaque module s'exécute seul et affiche son `collect()` en JSON sur stdout :
 python -m modules.market "Agronomic Treatment"
 python -m modules.commander
 python -m modules.logbook 20     # 20 dernières étapes du journal de bord
+python -m modules.distance "Sol"  # à combien d'années-lumière suis-je de Sol ?
 ```
+
+## Distance à un système
+
+`modules/distance.py` répond à une question posée à la volée — « à combien
+d'années-lumière suis-je du système X ? » — en combinant la position
+actuelle du commander (dernier `FSDJump`/`CarrierJump`/`Location` du
+journal local) et les coordonnées du système cible (EDSM). Distance
+arrondie à l'entier le plus proche :
+
+```
+$ python -m modules.distance "Sol"
+Sol est à 64 années-lumière de votre position actuelle (Sosoling).
+```
+
+Cette même distance est aussi injectée automatiquement dans les résultats
+de `modules/market.py` : chaque station retournée (achat comme vente) porte
+un champ `distance_from_commander_ly`, calculé sans appel réseau
+supplémentaire — Ardent fournit déjà les coordonnées de chaque système dans
+ses réponses. Le contexte de calcul (`position_commander`) est inclus une
+fois dans le résultat. Si la position du commander est introuvable (jeu
+jamais lancé localement), ces champs sont `null` plutôt que de faire
+échouer la collecte.
 
 ## Stockage
 
