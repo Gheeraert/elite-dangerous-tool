@@ -38,7 +38,9 @@ plusieurs sources, et renvoie toujours un dict avec au minimum un champ
 ## Prérequis
 
 - Python 3.11+ (utilise `tomllib`, dans la bibliothèque standard depuis 3.11)
-- `pip install requests`
+- `pip install requests cryptography` (`cryptography` sert uniquement à
+  générer le certificat TLS auto-signé local pour le callback CAPI, voir
+  plus bas)
 
 ## Configuration
 
@@ -134,14 +136,40 @@ GROUP BY commodity
 ORDER BY profit DESC;
 ```
 
-## État de `sources/capi.py`
+## `sources/capi.py` — authentification CAPI
 
-Le squelette OAuth2 (constantes des endpoints, échange de code, refresh
-token, appels `/profile` `/shipyard` `/fleetcarrier`) est en place, mais le
-flux d'autorisation interactif (ouverture navigateur, capture du `code` de
-retour) n'est pas implémenté — voir les commentaires en tête de fichier.
-`modules/commander.py` détecte cette absence et retombe silencieusement sur
-les fichiers locaux.
+Le flux OAuth2 complet est implémenté et testé en conditions réelles :
+PKCE (pas besoin de `client_secret` si l'app Frontier n'en fournit pas),
+serveur de callback local, vérification du `state` (CSRF), échange du code,
+sauvegarde du token dans `.capi_token.json` (exclu du dépôt).
+
+```
+python -m sources.capi authorize   # ouvre le navigateur, capte le callback, sauvegarde le token
+python -m sources.capi test        # vérifie le token en appelant /profile
+```
+
+Prérequis dans `config.toml` (voir `config.example.toml`) : `client_id`
+(et `client_secret` si votre app Frontier en a un — sinon laissez vide,
+PKCE suffit) et `redirect_uri`. Créer l'app sur
+https://user.frontierstore.net/ (menu "Developer Zone" > "Create Client").
+
+**Point de vigilance découvert en testant** : le formulaire Frontier peut
+imposer un `redirect_uri` en **https**, y compris pour `localhost`. Le
+serveur de callback local gère ce cas en générant un certificat TLS
+auto-signé à la volée (dépendance `cryptography`, fichiers `.capi_dev_cert.pem`
+/ `.capi_dev_key.pem` exclus du dépôt) : le navigateur affichera un
+avertissement de sécurité sur `localhost` à accepter manuellement une fois
+— normal pour un certificat auto-signé, pas un signe de mauvaise
+configuration.
+
+`modules/commander.py` utilise la CAPI en priorité si `.capi_token.json`
+existe, et retombe silencieusement sur les fichiers locaux sinon (champ
+`source: "local"` vs `"capi"` dans le résultat de `collect()`).
+
+Ce qui reste non fait : rafraîchissement automatique du token avant
+expiration (`refresh_access_token()` existe mais n'est pas appelé
+automatiquement — un `.capi_token.json` expiré nécessite de relancer
+`authorize`).
 
 ## Ajouter un nouveau module
 

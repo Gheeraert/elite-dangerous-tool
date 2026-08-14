@@ -7,6 +7,9 @@ config.toml
 .capi_token.json
 *.cookies
 
+# Certificat TLS auto-signé du serveur de callback local CAPI (dev uniquement)
+*.pem
+
 # Bases de données (phase future)
 *.db
 *.sqlite

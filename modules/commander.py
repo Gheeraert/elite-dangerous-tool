@@ -58,21 +58,34 @@ def _from_capi(access_token: str, host: str) -> dict:
 
     try:
         carrier = capi.get_fleetcarrier(access_token, host)
+        name_info = carrier.get("name", {}) if isinstance(carrier.get("name"), dict) else {}
+        finance = carrier.get("finance", {}) if isinstance(carrier.get("finance"), dict) else {}
         result["fleet_carrier"] = {
-            "nom": carrier.get("name", {}).get("vanityName") if isinstance(carrier.get("name"), dict) else None,
-            "callsign": carrier.get("name", {}).get("callsign") if isinstance(carrier.get("name"), dict) else None,
+            "nom": _decode_carrier_vanity_name(name_info.get("vanityName")),
+            "callsign": name_info.get("callsign"),
             "position": carrier.get("currentStarSystem"),
-            "solde": carrier.get("finance", {}).get("cash"),
+            "solde": finance.get("bankBalance"),
             "carburant": carrier.get("fuel"),
             "capacite": carrier.get("capacity"),
             "commandes": carrier.get("orders"),
-            "taxation": carrier.get("finance", {}).get("taxRate"),
-            "equipage": carrier.get("crew"),
+            "taxation": finance.get("taxation"),
+            "equipage": carrier.get("servicesCrew"),
         }
     except Exception:
         pass  # fleet carrier optionnel : absence de carrier possédé, ou endpoint indisponible
 
     return result
+
+
+def _decode_carrier_vanity_name(vanity_name) -> str | None:
+    """La CAPI renvoie le nom du fleet carrier encodé en hexadécimal
+    (ex. "5b424253435d..." -> "[BBSC] LA BUVETTE")."""
+    if not vanity_name:
+        return None
+    try:
+        return bytes.fromhex(vanity_name).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return vanity_name  # format inattendu : on renvoie la valeur brute plutôt que planter
 
 
 def _group_shiplocker_items(shiplocker: dict) -> dict:
