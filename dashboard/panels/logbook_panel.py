@@ -62,11 +62,16 @@ def build(parent: ttk.Frame, conn) -> ttk.Frame:
     frame.rowconfigure(2, weight=1)
     frame.columnconfigure(0, weight=1)
 
-    ttk.Button(frame, text="Actualiser maintenant", command=lambda: _refresh(conn, n_var.get(), status_var, content)).grid(
+    do_refresh = lambda: _refresh(conn, n_var.get(), status_var, content)
+    ttk.Button(frame, text="Actualiser maintenant", command=do_refresh).grid(
         column=0, row=3, sticky="w", pady=(10, 0)
     )
 
     _render(conn, n_var.get(), status_var, content)
+
+    # Exposé pour le bouton global "Tout actualiser" de dashboard/app.py :
+    # exactement la même action que le bouton de cet onglet, rien de dupliqué.
+    frame.trigger_refresh = do_refresh
     return frame
 
 

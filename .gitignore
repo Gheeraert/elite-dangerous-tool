@@ -10,8 +10,10 @@ config.toml
 # Certificat TLS auto-signé du serveur de callback local CAPI (dev uniquement)
 *.pem
 
-# Bases de données (phase future)
+# Bases de données (mode WAL de storage/db.py : fichiers -shm/-wal en plus du .db)
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 

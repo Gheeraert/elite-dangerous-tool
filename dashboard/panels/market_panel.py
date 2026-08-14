@@ -52,14 +52,16 @@ def build(parent: ttk.Frame, conn) -> ttk.Frame:
     ttk.Button(controls, text="Afficher", command=show_from_db).grid(column=2, row=0)
     entry.bind("<Return>", lambda _e: show_from_db())
 
+    do_refresh = lambda: _refresh(conn, commodity_var.get().strip(), app_config, status_var, content)
     buttons = ttk.Frame(frame)
     buttons.grid(column=0, row=3, sticky="w", pady=(10, 0))
-    ttk.Button(
-        buttons, text="Actualiser maintenant",
-        command=lambda: _refresh(conn, commodity_var.get().strip(), app_config, status_var, content),
-    ).grid(column=0, row=0)
+    ttk.Button(buttons, text="Actualiser maintenant", command=do_refresh).grid(column=0, row=0)
 
     show_from_db()
+
+    # Exposé pour le bouton global "Tout actualiser" de dashboard/app.py :
+    # actualise avec la commodité actuellement affichée dans ce champ.
+    frame.trigger_refresh = do_refresh
     return frame
 
 

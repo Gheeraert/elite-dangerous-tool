@@ -273,6 +273,12 @@ automatique, jamais au chargement (pas de thread de rafraîchissement
 caché). C'est `storage/loop.py`, pas l'interface, qui a la responsabilité
 de remplir la base en continu.
 
+Un bouton global **« Tout actualiser »**, dans la barre au-dessus des
+onglets, enchaîne les mêmes actions que les boutons par onglet (commander,
+marché, journal, puis le rapport en dernier pour qu'il reflète les données
+fraîches) — un clic au lieu de quatre, mais toujours un appel réseau par
+module, ni plus ni moins.
+
 ## `sources/capi.py` — authentification CAPI
 
 Le flux OAuth2 complet est implémenté et testé en conditions réelles :

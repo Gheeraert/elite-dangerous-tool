@@ -58,6 +58,11 @@ def build(parent: ttk.Frame, conn) -> ttk.Frame:
     frame.columnconfigure(0, weight=1)
 
     refresh()
+
+    # Exposé pour le bouton global "Tout actualiser" de dashboard/app.py :
+    # pas de collecteur réseau dédié au rapport, juste la requête rejouée
+    # (utile pour refléter ce que les autres onglets viennent de matérialiser).
+    frame.trigger_refresh = refresh
     return frame
 
 
