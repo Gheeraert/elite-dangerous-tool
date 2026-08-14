@@ -15,6 +15,8 @@ Points de vigilance :
 
 import json
 import os
+import threading
+import time
 from pathlib import Path
 from typing import Iterator
 
@@ -50,6 +52,51 @@ def list_journal_files(journal_dir: Path) -> list[Path]:
     if not journal_dir.is_dir():
         return []
     return sorted(journal_dir.glob("Journal.*.log"))
+
+
+def latest_journal_file(journal_dir: Path) -> Path | None:
+    files = list_journal_files(journal_dir)
+    return files[-1] if files else None
+
+
+def watch_for_new_events(
+    journal_dir: Path, poll_interval: float = 5.0, stop_event: threading.Event | None = None
+) -> Iterator[Path]:
+    """Génère le fichier journal actif chaque fois qu'il a grossi depuis la
+    dernière vérification — signe qu'un nouvel événement de jeu vient d'être
+    écrit (le jeu réécrit Journal.*.log en append-only, jamais en place).
+
+    Poll simple (taille de fichier toutes les `poll_interval` secondes)
+    plutôt que `watchdog` : pas de nouvelle dépendance, cohérent avec la
+    sobriété du projet, et la fréquence d'écriture réelle (au mieux
+    quelques événements par minute en jeu) ne justifie pas une lib de
+    notification filesystem. Si ça devait s'avérer insuffisant en pratique
+    (latence perçue trop grande), c'est le paramètre à ajuster en premier
+    avant d'envisager watchdog.
+
+    S'arrête proprement dès que `stop_event` est déclenché (permet un Ctrl+C
+    réactif depuis storage/loop.py) ; sans `stop_event`, boucle indéfiniment."""
+    last_path: Path | None = None
+    last_size: int | None = None
+    while stop_event is None or not stop_event.is_set():
+        current = latest_journal_file(journal_dir)
+        size = None
+        if current is not None:
+            try:
+                size = current.stat().st_size
+            except OSError:
+                current = None
+
+        if current is not None:
+            if last_path is not None and (current != last_path or size != last_size):
+                yield current
+            last_path, last_size = current, size
+
+        if stop_event is not None:
+            if stop_event.wait(poll_interval):
+                break
+        else:
+            time.sleep(poll_interval)
 
 
 def iter_journal_events(files: list[Path]) -> Iterator[dict]:

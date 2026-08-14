@@ -25,3 +25,22 @@ default_station_count = 15
 # Laisser vide pour le défaut : elite.db à la racine du dépôt.
 # La base réelle n'est jamais committée (voir .gitignore).
 path = "elite.db"
+
+[loop]
+# Intervalles de storage/loop.py (boucle de collecte en fond pendant une
+# session de jeu). Le collecteur marché/commander utilise [market] pour la
+# commodité/nombre de stations, pas de duplication ici. Peuvent aussi être
+# passés en ligne de commande (--market-interval, etc.), qui ont priorité.
+#
+# market : les données Ardent viennent de contributions EDDN communautaires,
+# pas d'un flux temps réel — interroger plus souvent que ça n'apporte pas de
+# fraîcheur supplémentaire.
+market_interval_minutes = 20
+# commander : nécessite un token CAPI (sinon ce collecteur se désactive
+# silencieusement). ~1 requête/minute recommandée côté Frontier, donc très
+# large marge ; intervalle distinct du marché surtout pour la lisibilité
+# des logs, la donnée commander changeant lentement de toute façon.
+commander_interval_minutes = 25
+# logbook : pas un intervalle mais la fréquence de sondage de la taille du
+# fichier journal actif (voir sources.journal.watch_for_new_events).
+journal_poll_seconds = 5

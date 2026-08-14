@@ -25,7 +25,9 @@ elite-dangerous-tool/
 ├── storage/              # pont SQLite entre les collectes et leur exploitation dans le temps
 │   ├── db.py             # connexion + schéma (créé automatiquement au premier usage)
 │   ├── collector.py       # collect() -> ligne brute dans la table `collections`
-│   └── materializer.py    # `collections` -> tables dérivées indexées
+│   ├── materializer.py    # `collections` -> tables dérivées indexées
+│   ├── reports.py         # requêtes en lecture seule (ex. profit par commodité)
+│   └── loop.py            # boucle de collecte en fond pendant une session de jeu
 ├── config.example.toml  # à copier vers config.toml (jamais commité)
 └── .gitignore
 ```
@@ -158,6 +160,51 @@ routes commerciales.
 Si la base n'a pas encore de table dérivée (aucune collecte lancée), le
 script affiche un message clair invitant à lancer `storage/collector.py`
 puis `storage/materializer.py`, plutôt qu'une trace d'erreur brute.
+
+## Boucle de collecte (`storage/loop.py`)
+
+`storage/collector.py` ne remplit la base que si on le lance à la main.
+`storage/loop.py` est fait pour tourner en fond **pendant une session de
+jeu** et alimenter la base en continu, sans intervention :
+
+```
+python -m storage.loop
+```
+
+Trois activités concurrentes, chacune avec sa propre connexion SQLite
+(`storage/db.py` active le mode WAL pour permettre des écritures
+concurrentes sans erreurs `database is locked`) :
+
+- **`logbook`** : réactif, pas périodique — surveille la taille du fichier
+  `Journal.*.log` actif (sondage simple, quelques secondes, voir
+  `sources.journal.watch_for_new_events`) et relance une collecte dès qu'il
+  grossit (un `Docked`, `FSDJump`, etc. vient d'être écrit par le jeu).
+- **`market`** : à intervalle fixe (20 min par défaut) — les données Ardent
+  viennent de contributions EDDN communautaires, interroger plus souvent
+  n'apporte pas de fraîcheur supplémentaire.
+- **`commander`** : à intervalle fixe plus large (25 min par défaut), et
+  **uniquement si un token CAPI est disponible** (`.capi_token.json`
+  présent, voir la section CAPI plus bas) — sinon ce collecteur se
+  désactive silencieusement au démarrage (un seul message, pas de tentative
+  répétée qui échoue en boucle).
+
+Chaque collecte réussie est immédiatement matérialisée (pas d'attente
+d'une passe `storage/materializer.py` séparée). Chaque tick est protégé
+individuellement : une erreur réseau ou autre est affichée avec un
+horodatage mais n'arrête jamais la boucle globale. `Ctrl+C` arrête
+proprement (attend la fin des collectes en cours, ferme les connexions).
+
+Options utiles (défauts lisibles dans `[loop]`/`[market]` de
+`config.toml`, surchargeables sans toucher au code) :
+
+```
+python -m storage.loop --market-interval 30 --commander-interval 45
+python -m storage.loop --no-commander          # pas de token CAPI configuré
+python -m storage.loop --market-commodity "Gold" --market-stations 10
+```
+
+Pas de service système (systemd/tâche planifiée) dans cette passe : un
+script à lancer manuellement dans un terminal en début de session suffit.
 
 ## `sources/capi.py` — authentification CAPI
 

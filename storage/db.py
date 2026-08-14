@@ -94,6 +94,12 @@ def connect(db_path: str | Path | None = None) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path))
     conn.execute("PRAGMA foreign_keys = ON")
+    # WAL : plusieurs connexions (une par thread de storage/loop.py) peuvent
+    # écrire sans se heurter à "database is locked" au premier chevauchement ;
+    # busy_timeout absorbe le cas résiduel d'une écriture concurrente exacte
+    # en attendant plutôt qu'en échouant immédiatement.
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
     conn.executescript(SCHEMA)
     conn.commit()
     return conn
