@@ -19,3 +19,9 @@ directory = ""
 [market]
 default_commodity = "Agronomic Treatment"
 default_station_count = 15
+
+[storage]
+# Chemin de la base SQLite (relatif à la racine du dépôt si non absolu).
+# Laisser vide pour le défaut : elite.db à la racine du dépôt.
+# La base réelle n'est jamais committée (voir .gitignore).
+path = "elite.db"

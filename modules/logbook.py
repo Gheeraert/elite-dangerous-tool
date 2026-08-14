@@ -26,7 +26,9 @@ _STEP_EVENTS = {
 
 def _empty_activity() -> dict:
     return {
-        "commerce": {"achats": 0, "ventes": 0, "credits_depenses": 0, "credits_recus": 0},
+        # Une entrée par transaction (pas un simple compteur) : c'est ce qui permet
+        # au matérialiseur de stockage de peupler market_transactions ligne par ligne.
+        "commerce": {"achats": [], "ventes": []},
         "combat": {"primes": 0, "recompenses": 0},
         "minage": {"materiaux": {}},
         "exploration": {"signaux_detectes": 0},
@@ -35,21 +37,38 @@ def _empty_activity() -> dict:
 
 def _activity_has_content(activity: dict) -> bool:
     return (
-        any(activity["commerce"].values())
+        bool(activity["commerce"]["achats"])
+        or bool(activity["commerce"]["ventes"])
         or any(activity["combat"].values())
         or bool(activity["minage"]["materiaux"])
         or activity["exploration"]["signaux_detectes"] > 0
     )
 
 
-def _apply_activity_event(activity: dict, event: dict) -> None:
+def _apply_activity_event(activity: dict, event: dict, current_station: dict) -> None:
     etype = event.get("event")
     if etype == "MarketBuy":
-        activity["commerce"]["achats"] += 1
-        activity["commerce"]["credits_depenses"] += event.get("TotalCost", 0) or 0
+        activity["commerce"]["achats"].append({
+            "horodatage": event.get("timestamp"),
+            "commodity": event.get("Type_Localised", event.get("Type", "?")),
+            "market_id": current_station.get("market_id"),
+            "station": current_station.get("station"),
+            "systeme": current_station.get("systeme"),
+            "quantite": event.get("Count", 0),
+            "prix_unitaire": event.get("BuyPrice", 0),
+            "valeur_totale": event.get("TotalCost", 0),
+        })
     elif etype == "MarketSell":
-        activity["commerce"]["ventes"] += 1
-        activity["commerce"]["credits_recus"] += event.get("TotalSale", 0) or 0
+        activity["commerce"]["ventes"].append({
+            "horodatage": event.get("timestamp"),
+            "commodity": event.get("Type_Localised", event.get("Type", "?")),
+            "market_id": current_station.get("market_id"),
+            "station": current_station.get("station"),
+            "systeme": current_station.get("systeme"),
+            "quantite": event.get("Count", 0),
+            "prix_unitaire": event.get("SellPrice", 0),
+            "valeur_totale": event.get("TotalSale", 0),
+        })
     elif etype == "Bounty":
         activity["combat"]["primes"] += 1
         activity["combat"]["recompenses"] += event.get("TotalReward", event.get("Reward", 0)) or 0
@@ -85,16 +104,26 @@ def collect(max_entries: int | None = None) -> dict:
     entries: list[dict] = []
     activity = _empty_activity()
     current_system: str | None = None
+    # Rempli sur Docked, conservé tel quel après Undocked (les transactions ne
+    # peuvent survenir qu'amarré, donc rester "collé" à la dernière station ne
+    # produit jamais de fausse association).
+    current_station: dict = {"market_id": None, "station": None, "systeme": None}
 
     for event in journal.iter_journal_events(files):
         etype = event.get("event")
         if etype in ("FSDJump", "CarrierJump"):
             current_system = event.get("StarSystem") or current_system
+        if etype == "Docked":
+            current_station = {
+                "market_id": event.get("MarketID"),
+                "station": event.get("StationName"),
+                "systeme": event.get("StarSystem") or current_system,
+            }
         if etype in _STEP_EVENTS:
             entries.append(_make_step_entry(event, activity, current_system))
             activity = _empty_activity()
         else:
-            _apply_activity_event(activity, event)
+            _apply_activity_event(activity, event, current_station)
 
     if max_entries is not None:
         entries = entries[-max_entries:]

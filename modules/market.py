@@ -21,6 +21,7 @@ def _normalize_station(entry: dict, direction: str) -> dict:
     il faut donc choisir le bon champ selon le sens plutôt qu'un simple premier-non-nul."""
     price_key = "sellPrice" if direction == "sell" else "buyPrice"
     return {
+        "market_id": entry.get("marketId"),
         "system": community.first_present(entry, "systemName", "system"),
         "station": community.first_present(entry, "stationName", "station"),
         "price": community.first_present(entry, price_key, "price"),
