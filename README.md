@@ -118,23 +118,46 @@ Le module `commander` n'a pas encore de table dérivée dans ce schéma :
 implémenter dans une phase future si un historique (crédits, flotte...)
 devient utile.
 
-### Exemple de requête : profit réel par commodité sur 30 jours
+### Rapports (`storage/reports.py`)
 
-Rendue possible par `market_transactions`, qui garde achats et ventes
-individuels (et non de simples agrégats) :
+Lecture seule sur le pont SQLite — uniquement des `SELECT`, jamais
+d'écriture. Premier rapport : profit réel par commodité, comparé au
+meilleur prix communautaire connu au moment de chaque vente.
 
-```sql
-SELECT
-    commodity,
-    SUM(CASE WHEN direction = 'vente' THEN total_value ELSE 0 END)
-        - SUM(CASE WHEN direction = 'achat' THEN total_value ELSE 0 END) AS profit,
-    SUM(CASE WHEN direction = 'achat' THEN quantity ELSE 0 END) AS unites_achetees,
-    SUM(CASE WHEN direction = 'vente' THEN quantity ELSE 0 END) AS unites_vendues
-FROM market_transactions
-WHERE timestamp >= datetime('now', '-30 days')
-GROUP BY commodity
-ORDER BY profit DESC;
 ```
+python -m storage.reports --days 30
+```
+
+Pour chaque commodité ayant au moins une transaction dans la fenêtre :
+nombre et quantité d'achats/ventes, crédits dépensés/reçus, profit réel
+brut (`credits_recus - credits_depenses`). Pour les ventes, un « écart
+marché » : la différence entre ce que la vente a réellement rapporté et ce
+qu'elle aurait rapporté au meilleur prix connu dans `price_checks` juste
+avant la transaction (instantané le plus proche mais antérieur ou égal).
+Si aucun `price_check` n'existe dans les 7 jours précédant une vente, elle
+est exclue du calcul d'écart plutôt que de comparer à une donnée trop
+ancienne — le nombre de ventes ainsi exclues est rappelé en pied de rapport.
+
+Exemple de sortie (illustratif, sur un jeu de données de démonstration —
+`n/a` quand aucune vente de la commodité n'a de `price_check` comparable) :
+
+```
+Commodité                 Achats  Ventes  Qté ach. Qté vendue       Dépensé          Reçu   Profit réel  Écart marché  Écart %
+--------------------------------------------------------------------------------------------------------------------------------
+Agronomic Treatment           35      28    30 384     23 600    79 666 848   468 253 120   388 586 272  -142 008 256   -33.3%
+gold                          22       6     1 436      2 269     6 559 803   122 034 498   115 474 695           n/a      n/a
+
+(84 vente(s) sans price_check dans les 7 jours précédents : exclues du calcul d'écart marché.)
+```
+
+Ici, l'écart négatif signifie que les ventes réelles ont rapporté ~33 %
+de moins que si elles avaient été faites au meilleur prix communautaire
+connu juste avant chaque vente — un signal concret pour ajuster ses
+routes commerciales.
+
+Si la base n'a pas encore de table dérivée (aucune collecte lancée), le
+script affiche un message clair invitant à lancer `storage/collector.py`
+puis `storage/materializer.py`, plutôt qu'une trace d'erreur brute.
 
 ## `sources/capi.py` — authentification CAPI
 
