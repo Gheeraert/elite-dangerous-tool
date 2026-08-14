@@ -1,0 +1,21 @@
+# Copier ce fichier vers config.toml et renseigner les valeurs réelles.
+# config.toml est exclu du dépôt (.gitignore) : n'y committez jamais de secrets.
+
+[capi]
+# Créés sur https://developer.frontierstore.net/ (application OAuth2).
+client_id = ""
+client_secret = ""
+redirect_uri = "http://localhost:8080/callback"
+# Scope obligatoire : le scope "capi" seul renvoie une 401.
+scope = "auth capi"
+# "live" ou "legacy"
+environment = "live"
+
+[journal]
+# Laisser vide pour utiliser le dossier par défaut :
+# %USERPROFILE%\Saved Games\Frontier Developments\Elite Dangerous
+directory = ""
+
+[market]
+default_commodity = "Agronomic Treatment"
+default_station_count = 15

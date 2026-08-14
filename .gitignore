@@ -1,0 +1,28 @@
+# Secrets et configuration locale
+config.toml
+.env
+
+# Tokens / cookies de session (CAPI OAuth2, etc.)
+*.token.json
+.capi_token.json
+*.cookies
+
+# Bases de données (phase future)
+*.db
+*.sqlite
+*.sqlite3
+
+# Dumps de journal personnel copiés pour test
+journal_samples/
+*.journal_dump/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
