@@ -6,9 +6,11 @@ authentifiée) et fichiers journaux locaux du jeu — pour se passer d'outils
 lourds type Inara.
 
 **Phase 1** a mis en place la couche de collecte (`sources/`, `modules/`),
-sans stockage persistant. **Phase 2 (état actuel de ce dépôt)** ajoute le
-pont SQLite (`storage/`) qui archive et exploite ces collectes dans le
-temps. Toujours pas d'interface graphique — pour une phase ultérieure.
+sans stockage persistant. **Phase 2** ajoute le pont SQLite (`storage/`)
+qui archive et exploite ces collectes dans le temps, avec `storage/loop.py`
+pour l'alimenter en continu pendant une session. **Interface (état actuel
+de ce dépôt)** ajoute `dashboard/`, une fenêtre Tkinter qui affiche ce que
+la base contient déjà.
 
 ## Architecture
 
@@ -31,6 +33,10 @@ elite-dangerous-tool/
 │   ├── materializer.py    # `collections` -> tables dérivées indexées
 │   ├── reports.py         # requêtes en lecture seule (ex. profit par commodité)
 │   └── loop.py            # boucle de collecte en fond pendant une session de jeu
+├── dashboard/            # interface Tkinter, lecture seule sur la base par défaut
+│   ├── app.py             # point d'entrée : python -m dashboard.app
+│   ├── data.py             # accès en lecture seule à `collections` (aucune écriture)
+│   └── panels/             # un fichier par onglet (commander, marché, journal, rapport)
 ├── config.example.toml  # à copier vers config.toml (jamais commité)
 └── .gitignore
 ```
@@ -231,6 +237,41 @@ python -m storage.loop --market-commodity "Gold" --market-stations 10
 
 Pas de service système (systemd/tâche planifiée) dans cette passe : un
 script à lancer manuellement dans un terminal en début de session suffit.
+
+## Interface (`dashboard/app.py`)
+
+Fenêtre Tkinter (bibliothèque standard, pas de nouvelle dépendance) qui
+affiche ce que la base contient déjà :
+
+```
+python -m dashboard.app
+```
+
+**`storage/loop.py` doit tourner à côté (ou avoir tourné avant)** pour
+qu'il y ait quelque chose à afficher — l'interface ne fait aucun appel
+réseau au chargement, elle lit uniquement la base via sa propre connexion
+(`storage.db.connect()`). Sans données en base, chaque onglet affiche un
+message clair plutôt qu'un écran vide.
+
+Quatre onglets, chacun sur la dernière collecte en base pour son module :
+
+- **Commander** : identité, rangs, finances, vaisseau actuel, résumé de
+  flotte, fleet carrier (s'il existe).
+- **Marché** : champ commodité (défaut : `[market].default_commodity` de
+  `config.toml`), meilleures stations d'achat/vente de la dernière collecte
+  correspondante, distance au commander incluse quand le champ est présent
+  (les collectes antérieures à son ajout ne l'ont pas — affiché `n/a`).
+- **Journal de bord** : les N dernières étapes de la dernière collecte,
+  résumées (pas un dump brut) — même esprit que `modules/logbook.py`.
+- **Rapport** : `storage.reports.profit_by_commodity()` réutilisée telle
+  quelle, avec la fenêtre en jours ajustable.
+
+**Lecture seule par défaut.** Chaque onglet a son propre bouton
+« Actualiser maintenant », seule action qui écrit : elle appelle
+`storage.collector.record_xxx()` une fois puis relit — jamais en
+automatique, jamais au chargement (pas de thread de rafraîchissement
+caché). C'est `storage/loop.py`, pas l'interface, qui a la responsabilité
+de remplir la base en continu.
 
 ## `sources/capi.py` — authentification CAPI
 
